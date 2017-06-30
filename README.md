@@ -50,14 +50,15 @@ Under `protected List<ReactPackage> getPackages() {`:
   );
 ```
 
-### Usage
+### Example
 
 ```javascript
 import {
   Alert,
   Linking,
   NativeModules,
-  Platform
+  Platform,
+  AppState
 } from "react-native";
 import Permissions from "react-native-permissions";
 import i18n from "react-native-i18n";
@@ -66,6 +67,7 @@ import LocationServicesDialogBox from "react-native-android-location-services-di
 export default class gps {
   constructor() {
     this.watchID = null;
+    this.onAppStateChange = this._onAppStateChange.bind(this);
   }
   /**
      * GPS switch off
@@ -77,10 +79,24 @@ export default class gps {
     navigator.geolocation.clearWatch(this.watchID);
   }
 
+  _onAppStateChange(state) {
+    console.log("_onAppStateChange", state);
+    if (state == "active") {
+      this.requestGps(this.success, this.failed);
+      AppState.removeEventListener("change", this.onAppStateChange);
+    }
+  }
+
   //open location setting
-  openLocationSettings() {
+  openLocationSettings(success, failed) {
+    let onAppStateChange;
+    this.success = success;
+    this.failed = failed;
+    AppState.addEventListener("change", this.onAppStateChange);
+
     if (Platform.OS == "ios") Linking.openURL("app-settings:");
-    else LocationServicesDialogBox.openLocationSetting();
+    else if (LocationServicesDialogBox != undefined)
+      LocationServicesDialogBox.openLocationSetting();
   }
 
   /**
@@ -88,7 +104,7 @@ export default class gps {
      * refer to: react-native-permissions
      */
   requestGps(success, failed) {
-    if (Platform.OS == "android") {
+    if (Platform.OS == "android" && LocationServicesDialogBox != undefined) {
       LocationServicesDialogBox.locationServicesIsEnable()
         .then(() => {
           this.turnOnGps(success, failed);
@@ -165,13 +181,14 @@ export default class gps {
 
         {
           text: i18n.t("Settings"),
-          onPress: () => this.openLocationSettings()
+          onPress: () => this.openLocationSettings(success, failed)
         }
       ],
       { cancelable: false }
     );
   }
 }
+
 
 ```
 
@@ -180,8 +197,6 @@ export default class gps {
 | Name                               | Return             |
 |------------------------------------|--------------------|
 |`locationServicesIsEnable`    | Promise            |
-|------------------------------------|--------------------|
 |`openLocationSetting`    |             |
 
 
-[![NPM](https://nodei.co/npm/react-native-android-location-services-dialog-box.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/react-native-android-location-services-dialog-box/)
