@@ -30,59 +30,35 @@ class LocationServicesDialogBoxModule extends ReactContextBaseJavaModule impleme
     }
 
     @ReactMethod
-    public void checkLocationServicesIsEnabled(ReadableMap configMap, Promise promise) {
+    public void locationServicesIsEnable(Promise promise)  {
         promiseCallback = promise;
-        map = configMap;
         currentActivity = getCurrentActivity();
-        checkLocationService(false);
-    }
-
-    private void checkLocationService(Boolean activityResult) {
-        if (currentActivity == null || map == null || promiseCallback == null) return;
         LocationManager locationManager = (LocationManager) currentActivity.getSystemService(Context.LOCATION_SERVICE);
-
         Boolean isEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-        if (!map.hasKey("enableHighAccuracy") || map.getBoolean("enableHighAccuracy")) {
-            isEnabled = isEnabled && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+    
+        if (isEnabled ){
+             promiseCallback.resolve("enabled");
+        }else{                
+          
+             promiseCallback.reject("disabled");
+            
         }
-        if (!isEnabled) {
-            if (activityResult) {
-                promiseCallback.reject(new Throwable("disabled"));
-            } else {
-                displayPromptForEnablingGPS(currentActivity, map, promiseCallback);
-            }
-        } else {
-            promiseCallback.resolve("enabled");
-        }
+
     }
 
-    private static void displayPromptForEnablingGPS(final Activity activity, final ReadableMap configMap, final Promise promise) {
-        final AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        final String action = android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS;
 
-        builder.setMessage(Html.fromHtml(configMap.getString("message")))
-                .setPositiveButton(configMap.getString("ok"),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialogInterface, int id) {
-                                activity.startActivityForResult(new Intent(action), ENABLE_LOCATION_SERVICES);
-                                dialogInterface.dismiss();
-                            }
-                        })
-                .setNegativeButton(configMap.getString("cancel"),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialogInterface, int id) {
-                                promise.reject(new Throwable("disabled"));
-                                dialogInterface.cancel();
-                            }
-                        });
-        builder.create().show();
+     @ReactMethod
+     public void openLocationSetting() {
+          currentActivity = getCurrentActivity();
+          final String action = android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS;
+          currentActivity.startActivityForResult(new Intent(action), ENABLE_LOCATION_SERVICES);
     }
+
 
     @Override
     public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
         if(requestCode == ENABLE_LOCATION_SERVICES) {
             currentActivity = activity;
-            checkLocationService(true);
         }
     }
 }
