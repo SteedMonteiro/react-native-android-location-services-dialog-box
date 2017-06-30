@@ -53,100 +53,135 @@ Under `protected List<ReactPackage> getPackages() {`:
 ### Usage
 
 ```javascript
-import LocationServicesDialogBox from "react-native-android-location-services-dialog-box";
-
-LocationServicesDialogBox.checkLocationServicesIsEnabled({
-    message: "<h2>Use Location ?</h2>This app wants to change your device settings:<br/><br/>Use GPS, Wi-Fi, and cell network for location<br/><br/><a href='#'>Learn more</a>",
-    ok: "YES",
-    cancel: "NO"
-}).then(function(success) {
-    console.log(success); // success => "enabled"
-}).catch((error) => {
-    console.log(error.message); // error.message => "disabled"
-});
-```
-
-### Usage And Example For Async Method `ES6`
-
-```javascript
-import LocationServicesDialogBox from "react-native-android-location-services-dialog-box";
-
-export default class LocationServiceTestPage extends Component {
-    constructor(props){
-        super(props);
-        this.checkIsLocation();
-    }
-    
-    async checkIsLocation():Boolean {
-        let check = await LocationServicesDialogBox.checkLocationServicesIsEnabled({
-            message: "Use Location ?",
-            ok: "YES",
-            cancel: "NO"
-        }).catch(error => error);
-
-        return Object.is(check, "enabled");
-    } 
-}
-```
-
-### Examples `ES6`
-```javascript
-import React, { Component } from 'react';
 import {
-    AppRegistry,
-    Text,
-    View
-} from 'react-native';
-
+  Alert,
+  Linking,
+  NativeModules,
+  Platform
+} from "react-native";
+import Permissions from "react-native-permissions";
+import i18n from "react-native-i18n";
 import LocationServicesDialogBox from "react-native-android-location-services-dialog-box";
 
-class SampleApp extends Component {
-    state = {
-        initialPosition: 'unknown',
-    };
+export default class gps {
+  constructor() {
+    this.watchID = null;
+  }
+  /**
+     * GPS switch off
+     */
+  turnOffGpsWatch() {
+    console.log("turnOffGpsWatch");
 
-    componentDidMount() {
-        LocationServicesDialogBox.checkLocationServicesIsEnabled({
-            message: "<h2>Use Location ?</h2>This app wants to change your device settings:<br/><br/>Use GPS, Wi-Fi, and cell network for location<br/><br/><a href='#'>Learn more</a>",
-            ok: "YES",
-            cancel: "NO"
-        }).then(function(success) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    let initialPosition = JSON.stringify(position);
-                    this.setState({ initialPosition });
-                }, error => console.log(error), { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 });
-            }.bind(this)
-        ).catch((error) => {
-            console.log(error.message);
+    if (this.watchID == null) return;
+    navigator.geolocation.clearWatch(this.watchID);
+  }
+
+  //open location setting
+  openLocationSettings() {
+    if (Platform.OS == "ios") Linking.openURL("app-settings:");
+    else LocationServicesDialogBox.openLocationSetting();
+  }
+
+  /**
+     * Request GPS permission if permission not granted, works for both android/ios
+     * refer to: react-native-permissions
+     */
+  requestGps(success, failed) {
+    if (Platform.OS == "android") {
+      LocationServicesDialogBox.locationServicesIsEnable()
+        .then(() => {
+          this.turnOnGps(success, failed);
+        })
+        .catch(() => {
+          this.enableGpsDialog(success, failed);
         });
+    } else {
+      this.turnOnGps(success, failed);
     }
+  }
 
-    render() {
-        return (
-            <View>
-                <Text>
-                    Geolocation: {this.state.initialPosition}
-                </Text>
-            </View>
-        );
-    }
+  /**
+     * Request GPS permission if permission not granted, works for both android/ios
+     * refer to: react-native-permissions
+     */
+  checkGps(success, failed) {
+    Permissions.requestPermission("location")
+      .then(response => {
+        //['authorized', 'denied', 'restricted', 'undetermined']
+        console.log("checkGps", response);
+        if (response == "authorized") {
+          this.requestGps(success, failed);
+        }
+      })
+      .catch(error => {
+        console.log("turnOnGps error", error);
+        failed();
+      });
+  }
+  /**
+     * GPS switch on
+     */
+  turnOnGps(success, failed) {
+    this.watchID = navigator.geolocation.getCurrentPosition(
+      position => {
+        console.log("turnOnGps position", position);
+        console.log("getCurrentPosition", position.coords);
+        success(position.coords);
+
+        this.watchID = navigator.geolocation.watchPosition(position => {
+          console.log("watchPosition", position);
+          success(position.coords);
+        });
+      },
+      error => {
+        console.log("turnOnGps error", error);
+
+        if (error.code === 1) {
+          this.enableGpsDialog(success, failed);
+        } else {
+          failed();
+        }
+      },
+      {
+        //enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 10000,
+        distanceFilter: 100
+      }
+    );
+  }
+
+  /**
+     * Open Gps dialog of system settings
+     * @param {null}
+     */
+  enableGpsDialog(success, failed) {
+    Alert.alert(
+      i18n.t("Turn on your location to use this service"),
+      "",
+      [
+        { text: i18n.t("Close"), onPress: () => failed() },
+
+        {
+          text: i18n.t("Settings"),
+          onPress: () => this.openLocationSettings()
+        }
+      ],
+      { cancelable: false }
+    );
+  }
 }
-AppRegistry.registerComponent('SampleApp', () => SampleApp);
+
 ```
-
-### Props
-
-| Prop             | Type        | Description                    |
-|------------------|-------------|--------------------------------|
-|`message`         |`HTML`       |Dialog box content text         |
-|`ok`              |`String`     |Dialog box ok button text       |
-|`cancel`          |`String`     |Dialog box cancel button text   |
 
 ### Methods
 
 | Name                               | Return             |
 |------------------------------------|--------------------|
-|`checkLocationServicesIsEnabled`    | Promise            |
+|`locationServicesIsEnable`    | Promise            |
+|------------------------------------|--------------------|
+|`openLocationSetting`    |             |
 
 
 [![NPM](https://nodei.co/npm/react-native-android-location-services-dialog-box.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/react-native-android-location-services-dialog-box/)
